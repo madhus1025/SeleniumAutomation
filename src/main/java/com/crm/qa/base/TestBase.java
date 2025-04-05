@@ -9,18 +9,26 @@ import java.util.concurrent.TimeUnit;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.firefox.FirefoxDriver;
-import org.openqa.selenium.support.events.EventFiringWebDriver;
-import org.testng.annotations.BeforeSuite;
-
+import org.openqa.selenium.support.events.EventFiringDecorator;
 import com.crm.qa.util.DriverManager;
 import com.crm.qa.util.TestUtil;
-import com.crm.qa.util.WebEventListener;
+
+import org.testng.annotations.BeforeSuite;
+import org.openqa.selenium.support.events.WebDriverListener;
+import org.openqa.selenium.support.events.EventFiringDecorator;
+import org.openqa.selenium.support.events.WebDriverListener;
+import io.github.bonigarcia.wdm.WebDriverManager;
+
+
+
+class WebEventListener implements WebDriverListener {
+    // Implement required event methods here
+}
 
 public class TestBase {
 
     public static WebDriver driver;
     public static Properties prop;
-    public static EventFiringWebDriver e_driver;
     public static WebEventListener eventListener;
 
     // Constructor to load properties
@@ -47,33 +55,33 @@ public class TestBase {
 
     // Initialize WebDriver
     private static void initializeDriver() {
-        String browserName = prop.getProperty("browser");
+    String browserName = prop.getProperty("browser");
 
-        if (browserName.equals("chrome")) {
-            // Wait for chromedriver to be ready
-            String chromeDriverPath = DriverManager.getChromeDriverPath();
-            System.setProperty("webdriver.chrome.driver", chromeDriverPath);
-            driver = new ChromeDriver();
-        } else if (browserName.equals("FF")) {
-            System.setProperty("webdriver.gecko.driver", "/path/to/geckodriver");
-            driver = new FirefoxDriver();
-        }
-
-        // Register WebDriver with EventFiringWebDriver
-        e_driver = new EventFiringWebDriver(driver);
-        eventListener = new WebEventListener();
-        e_driver.register(eventListener);
-        driver = e_driver;
-
-        // Browser configurations
-        driver.manage().window().maximize();
-        driver.manage().deleteAllCookies();
-        driver.manage().timeouts().pageLoadTimeout(TestUtil.PAGE_LOAD_TIMEOUT, TimeUnit.SECONDS);
-        driver.manage().timeouts().implicitlyWait(TestUtil.IMPLICIT_WAIT, TimeUnit.SECONDS);
-
-        // Navigate to the URL
-        driver.get(prop.getProperty("url"));
+    if (browserName.equalsIgnoreCase("chrome")) {
+        // Automatically download the correct ChromeDriver if not present
+        WebDriverManager.chromedriver().setup();
+        driver = new ChromeDriver();
+    } else if (browserName.equalsIgnoreCase("firefox")) {
+        // Automatically download the correct GeckoDriver if not present
+        WebDriverManager.firefoxdriver().setup();
+        driver = new FirefoxDriver();
+    } else {
+        throw new RuntimeException("Unsupported browser: " + browserName);
     }
+
+    // Use WebDriverListener with EventFiringDecorator
+    eventListener = new WebEventListener();
+    driver = new EventFiringDecorator<>(new WebDriverListener[]{eventListener}).decorate(driver);
+
+    // Browser configurations
+    driver.manage().window().maximize();
+    driver.manage().deleteAllCookies();
+    driver.manage().timeouts().pageLoadTimeout(TestUtil.PAGE_LOAD_TIMEOUT, TimeUnit.SECONDS);
+    driver.manage().timeouts().implicitlyWait(TestUtil.IMPLICIT_WAIT, TimeUnit.SECONDS);
+
+    // Navigate to the URL
+    driver.get(prop.getProperty("url"));
+}
 
     // Quit WebDriver
     public static void quitDriver() {
